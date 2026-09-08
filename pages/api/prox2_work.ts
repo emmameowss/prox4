@@ -31,18 +31,18 @@ import getRepository from "../../lib/db";
 export const config = api_config;
 
 const HELP = `
-Welcome to Prox2! I can help you submit confessions anonymously!
+Welcome to 4xorP! I can help you submit confessions anonymously!
 
-To get started, open a DM with Prox2 (or yourself.) Then, start typing your confession with
+To get started, open a DM with 4xorp (or yourself.) Then, start typing your confession with
 
-/prox2 <confession>
+/4xorp <confession>
 
 It's as simple as that!
 
 You can reply to an existing confession using the "Reply anonymously" message shortcut, or react to a message in the thread using the "React anonymously" shortcut!
 
 When a confession of yours gets published, I recommend you "follow thread" on it, so that you will be notified if someone replies in its thread.
-Prox2 can't do this automatically since it really doesn't know who published the confession.
+4xorp can't do this automatically since it really doesn't know who published the confession.
 
 Prox2 will be open source forever at https://github.com/anirudhb/prox2!
 `.trim();
@@ -93,7 +93,7 @@ export default async function handler(
     console.log(`User tried to stage confession outside of DM!`);
     await failRequest(
       data.response_url,
-      `Uh oh! You tried to stage a confession outside a DM. Try re-running this command inside a DM:\n/prox2 ${data.text}`
+      `Uh oh! You tried to stage a confession outside a DM. Try re-running this command inside a DM:\n/4xorp ${data.text}`
     );
     res.end();
     return;
@@ -111,7 +111,7 @@ export default async function handler(
   console.log(`Notifying user...`);
   await succeedRequest(
     data.response_url,
-    `Your message has been staged as confession #${confession_id} and will appear in <#CNMU9L92Q> if approved by the confessions review team!`
+    `Your message has been staged as confession #${confession_id} and will appear in <#C0C0K5D0468> if approved by the confessions review team!`
   );
   console.log(`Request success`);
   res.writeHead(200).end();
