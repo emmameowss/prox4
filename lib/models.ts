@@ -28,6 +28,6 @@ export class Confession {
   @Column()
   uid_hash!: string;
 
-  @Column()
-  user_id!: string;
+  @Column({ nullable: true })
+  user_id?: string;
 }

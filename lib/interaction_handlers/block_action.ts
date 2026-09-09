@@ -61,10 +61,13 @@ const block_action: InteractionHandler<BlockActionInteraction> = async data => {
                 throw `Failed to find confession with staging_ts=${data.message.ts}`;
             }
             // Send ephemeral message with user ID
+            const revealText = record.user_id 
+                ? `Confession author: <@${record.user_id}> (ID: ${record.user_id})`
+                : `Confession author: Unknown (created before user tracking was implemented)`;
             await web.chat.postEphemeral({
                 channel: data.channel.id,
                 user: data.user.id,
-                text: `Confession author: <@${record.user_id}> (ID: ${record.user_id})`
+                text: revealText
             });
             break;
         }
