@@ -311,6 +311,11 @@ const getStagingMessageBlocks = (id: number, text: string) => new Blocks([
         "approve:meta",
         "approve:meta"
     ),
+    new ButtonAction(
+        new PlainText(":eyes: Reveal"),
+        "reveal",
+        "reveal"
+    ),
   ]),
 ]).render();
 
@@ -353,6 +358,7 @@ export async function stageConfession(
       published_ts: "",
       uid_salt,
       uid_hash,
+      user_id: uid,
     });
   } catch (_) {
     throw "Failed to insert Postgres record";

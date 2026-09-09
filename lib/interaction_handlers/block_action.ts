@@ -50,7 +50,24 @@ const block_action: InteractionHandler<BlockActionInteraction> = async data => {
         case "approve:meta": {
             await viewConfession(repo, data.message.ts, true, data.user.id, null, true);
             break;
-          }         
+          }
+        case "reveal": {
+            console.log(`Reveal of message ts=${data.message.ts}`);
+            // Fetch the confession from the database
+            const record = await repo.findOne({
+                staging_ts: data.message.ts
+            });
+            if (!record) {
+                throw `Failed to find confession with staging_ts=${data.message.ts}`;
+            }
+            // Send ephemeral message with user ID
+            await web.chat.postEphemeral({
+                channel: data.channel.id,
+                user: data.user.id,
+                text: `Confession author: <@${record.user_id}> (ID: ${record.user_id})`
+            });
+            break;
+        }
         case "stage": {
             console.log(`Stage of message thread_ts=${data.message.thread_ts}`);
             // Get message contents

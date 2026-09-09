@@ -27,4 +27,7 @@ export class Confession {
   uid_salt!: string;
   @Column()
   uid_hash!: string;
+
+  @Column()
+  user_id!: string;
 }
