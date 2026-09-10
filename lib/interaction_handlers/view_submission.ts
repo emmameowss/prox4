@@ -3,7 +3,7 @@
 import { InteractionHandler, ViewSubmissionInteraction } from "../../pages/api/interaction_work";
 import { sameUser, unviewConfession, viewConfession, web } from "../main";
 import { MarkdownText, TextSection } from "../block_builder";
-import { confessions_channel, meta_channel, log_channel } from "../secrets_wrapper";
+import { confessions_channel, meta_channel, log_channel, staging_channel } from "../secrets_wrapper";
 import { sanitize } from "../sanitizer";
 import getRepository from "../db";
 
@@ -225,7 +225,7 @@ const view_submission: InteractionHandler<ViewSubmissionInteraction> = async (da
                 ? `Confession author: <@${record.user_id}> (ID: ${record.user_id})`
                 : `Confession author: Unknown (created before user tracking was implemented)`;
             await web.chat.postEphemeral({
-                channel: confessions_channel,
+                channel: staging_channel,
                 user: revealer_uid,
                 text: revealText
             });
@@ -234,7 +234,7 @@ const view_submission: InteractionHandler<ViewSubmissionInteraction> = async (da
             if (log_channel) {
                 await web.chat.postMessage({
                     channel: log_channel,
-                    text: `A confession's author was *revealed* by a member of the review team`
+                    text: `A confession's author was *revealed* by <@${revealer_uid}>`
                 });
             }
 
