@@ -3,7 +3,7 @@
 import { InteractionHandler, ViewSubmissionInteraction } from "../../pages/api/interaction_work";
 import { sameUser, unviewConfession, viewConfession, web } from "../main";
 import { MarkdownText, TextSection } from "../block_builder";
-import { confessions_channel, meta_channel } from "../secrets_wrapper";
+import { confessions_channel, meta_channel, log_channel } from "../secrets_wrapper";
 import { sanitize } from "../sanitizer";
 import getRepository from "../db";
 
@@ -37,6 +37,11 @@ export const [undo_confirm_id, undo_confirm_handler] = make_dialog<{
     reviewer_uid: string,
     undoer_uid: string
 }>("undo_confirm");
+
+export const [reveal_confirm_id, reveal_confirm_handler] = make_dialog<{
+    staging_ts: string,
+    revealer_uid: string
+}>("reveal_confirm");
 
 const view_submission: InteractionHandler<ViewSubmissionInteraction> = async (data, res) => {
     // todo passthrough return
@@ -201,6 +206,38 @@ const view_submission: InteractionHandler<ViewSubmissionInteraction> = async (da
             const { ts, reviewer_uid, undoer_uid } = args;
             const repo = await getRepository();
             await unviewConfession(repo, ts, reviewer_uid, undoer_uid);
+            return true;
+        }),
+
+        reveal_confirm_handler(async (args) => {
+            if(Array.isArray(args)) {
+                throw `reveal_confirm_handler is old format!`;
+            }
+            const { staging_ts, revealer_uid } = args;
+            const repo = await getRepository();
+            const record = await repo.findOne({ staging_ts });
+            if (!record) {
+                throw `Failed to find confession with staging_ts=${staging_ts}`;
+            }
+            
+            // Send ephemeral message with user ID
+            const revealText = record.user_id 
+                ? `Confession author: <@${record.user_id}> (ID: ${record.user_id})`
+                : `Confession author: Unknown (created before user tracking was implemented)`;
+            await web.chat.postEphemeral({
+                channel: confessions_channel,
+                user: revealer_uid,
+                text: revealText
+            });
+
+            // Log to log channel
+            if (log_channel) {
+                await web.chat.postMessage({
+                    channel: log_channel,
+                    text: `A confession's author was *revealed* by a member of the review team`
+                });
+            }
+
             return true;
         })
     ];

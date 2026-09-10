@@ -2,7 +2,7 @@ import { BlockActionInteraction, InteractionHandler } from "../../pages/api/inte
 import { stageConfession, viewConfession, web } from "../main";
 import { Blocks, InputSection, MarkdownText, PlainText, PlainTextInput, TextSection } from "../block_builder";
 import getRepository from "../db";
-import { approve_tw_id, undo_confirm_id } from "./view_submission";
+import { approve_tw_id, undo_confirm_id, reveal_confirm_id } from "./view_submission";
 
 const block_action: InteractionHandler<BlockActionInteraction> = async data => {
     console.log(`Block action!`);
@@ -53,22 +53,30 @@ const block_action: InteractionHandler<BlockActionInteraction> = async data => {
           }
         case "reveal": {
             console.log(`Reveal of message ts=${data.message.ts}`);
-            // Fetch the confession from the database
-            const record = await repo.findOne({
-                staging_ts: data.message.ts
+            // Show confirmation modal
+            const resp = await web.views.open({
+                trigger_id: data.trigger_id,
+                view: {
+                    callback_id: reveal_confirm_id({
+                        staging_ts: data.message.ts,
+                        revealer_uid: data.user.id
+                    }),
+                    type: "modal",
+                    title: new PlainText(`Reveal confession author`).render(),
+                    submit: new PlainText("Reveal").render(),
+                    close: new PlainText("Cancel").render(),
+                    blocks: new Blocks([
+                        new TextSection(
+                            new MarkdownText(
+                                "Are you sure you want to reveal the confession author? This action will be logged."
+                            )
+                        )
+                    ]).render()
+                }
             });
-            if (!record) {
-                throw `Failed to find confession with staging_ts=${data.message.ts}`;
+            if (!resp.ok) {
+                throw "Failed to open modal";
             }
-            // Send ephemeral message with user ID
-            const revealText = record.user_id 
-                ? `Confession author: <@${record.user_id}> (ID: ${record.user_id})`
-                : `Confession author: Unknown (created before user tracking was implemented)`;
-            await web.chat.postEphemeral({
-                channel: data.channel.id,
-                user: data.user.id,
-                text: revealText
-            });
             break;
         }
         case "stage": {
