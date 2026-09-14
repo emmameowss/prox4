@@ -474,6 +474,7 @@ export async function viewConfession(
     throw `Failed to update staging message`;
   }
   await postConfessionLog(record.id, { type: "view", approved: record.approved, meta: record.meta });
+  await notifyAuthor(record, approved);
   console.log(`Deleted!`);
 }
 
@@ -613,6 +614,57 @@ export async function postConfessionLog(
     });
   } catch (e) {
     console.log(`Failed to send log message!`);
+    console.log(JSON.stringify(e));
+    // non-fatal error
+    return;
+  }
+  console.log(`Sent!`);
+}
+
+export async function notifyAuthor(
+  record: Confession,
+  approved: boolean
+): Promise<void> {
+  if (!record.user_id) {
+    console.log(
+      `Confession #${record.id} has no user_id (created before user tracking), skipping author DM`
+    );
+    return;
+  }
+
+  let text;
+  if (approved) {
+    text = `:true: Your confession *#${record.id}* was approved${
+      record.meta ? " for meta" : ""
+    }!`;
+    if (record.published_ts) {
+      const target_channel = record.meta ? meta_channel : confessions_channel;
+      try {
+        const permalink = await web.chat.getPermalink({
+          channel: target_channel,
+          message_ts: record.published_ts,
+        });
+        if (permalink.ok && permalink.permalink) {
+          text += `\n${permalink.permalink}`;
+        }
+      } catch (e) {
+        console.log(`Failed to fetch permalink for confession #${record.id}!`);
+        console.log(JSON.stringify(e));
+        // non-fatal, send the DM without a link
+      }
+    }
+  } else {
+    text = `:x: Your confession *#${record.id}* was rejected.`;
+  }
+
+  console.log(`Sending decision DM to author of confession #${record.id}...`);
+  try {
+    await web.chat.postMessage({
+      channel: record.user_id,
+      text,
+    });
+  } catch (e) {
+    console.log(`Failed to send author DM!`);
     console.log(JSON.stringify(e));
     // non-fatal error
     return;
