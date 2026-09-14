@@ -27,7 +27,7 @@ import { NextApiRequest, NextApiResponse, PageConfig } from "next";
 
 import { Confession } from "./models";
 
-import { sanitize } from "./sanitizer";
+import { confessionRef, sanitize } from "./sanitizer";
 
 import {
   staging_channel,
@@ -642,7 +642,7 @@ export async function unviewConfession(
 
   // Log undo
   console.log(`Logging undo...`);
-  const log_message_text = `:rewind: ${old_approved ? `Approval${record.meta ? ' for meta' : ''}` : "Rejection"} (by <@${reviewer_uid}>) of confession #${record.id} undone by <@${undoer_uid}>`;
+  const log_message_text = `:rewind: ${old_approved ? `Approval${record.meta ? ' for meta' : ''}` : "Rejection"} (by <@${reviewer_uid}>) of confession ${confessionRef(record.id)} undone by <@${undoer_uid}>`;
   const log_message = await web.chat.postMessage({
     channel: staging_channel,
     text: "",
@@ -677,7 +677,7 @@ export async function postConfessionLog(
     actionText = action.approved ? "unapproved" : "unrejected";
   }
 
-  const logText = `Confession *#${id}* was *${actionText}*`;
+  const logText = `Confession *${confessionRef(id)}* was *${actionText}*`;
   console.log(`Sending message to log channel...`);
   try {
     await web.chat.postMessage({
@@ -706,7 +706,7 @@ export async function notifyAuthor(
 
   let text;
   if (approved) {
-    text = `:true: Your confession *#${record.id}* was approved${
+    text = `:true: Your confession *${confessionRef(record.id)}* was approved${
       record.meta ? " for meta" : ""
     }!`;
     if (record.published_ts) {
@@ -726,7 +726,7 @@ export async function notifyAuthor(
       }
     }
   } else {
-    text = `:x: Your confession *#${record.id}* was rejected.`;
+    text = `:x: Your confession *${confessionRef(record.id)}* was rejected.`;
   }
 
   console.log(`Sending decision DM to author of confession #${record.id}...`);

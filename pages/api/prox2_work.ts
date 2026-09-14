@@ -27,6 +27,7 @@ import {
   verifySignature,
 } from "../../lib/main";
 import getRepository from "../../lib/db";
+import { confessionRef } from "../../lib/sanitizer";
 
 export const config = api_config;
 
@@ -111,7 +112,7 @@ export default async function handler(
   console.log(`Notifying user...`);
   await succeedRequest(
     data.response_url,
-    `Your message has been staged as confession #${confession_id} and will appear in <#C0C0K5D0468> if approved by the 4xorp review team! (emma)`
+    `Your message has been staged as confession ${confessionRef(confession_id)} and will appear in <#C0C0K5D0468> if approved by the 4xorp review team! (emma)`
   );
   console.log(`Request success`);
   res.writeHead(200).end();

@@ -3,6 +3,7 @@ import { EMPTY_CONFESSION_ERROR, stageConfession, viewConfession, web } from "..
 import { droppedNotes, selectImages } from "../images";
 import { Blocks, InputSection, MarkdownText, PlainText, PlainTextInput, TextSection } from "../block_builder";
 import getRepository from "../db";
+import { confessionRef } from "../sanitizer";
 import { approve_tw_id, undo_confirm_id, reveal_confirm_id } from "./view_submission";
 
 const block_action: InteractionHandler<BlockActionInteraction> = async data => {
@@ -116,7 +117,7 @@ const block_action: InteractionHandler<BlockActionInteraction> = async data => {
                     new TextSection(
                         new MarkdownText(
                             [
-                                `:true: Staged as confession #${id}`,
+                                `:true: Staged as confession ${confessionRef(id)}`,
                                 ...droppedNotes(selection)
                             ].join("\n")
                         ),
