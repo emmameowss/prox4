@@ -15,6 +15,7 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import { NextApiRequest, NextApiResponse } from "next";
+import type { SlackFile } from "../../lib/images";
 import {
   api_config,
   setupMiddlewares,
@@ -33,12 +34,17 @@ interface UrlVerificationEvent {
 
 interface DMEvent {
   type: "message";
-  subtype?: "bot_message" | "thread_broadcast" | "message_changed";
+  subtype?:
+    | "bot_message"
+    | "thread_broadcast"
+    | "message_changed"
+    | "file_share";
   hidden?: boolean;
   channel_type: "im";
   ts: string;
   text: string;
   user: string;
+  files?: SlackFile[];
   bot_profile?: {
     app_id: string;
   };
@@ -89,7 +95,7 @@ export default async function handler(
         !data.hidden
       ) {
         // Handle DM staging...
-        await stageDMConfession(data.ts, data.user, data.text);
+        await stageDMConfession(data.ts, data.user, data.text, data.files);
       }
     }
   }

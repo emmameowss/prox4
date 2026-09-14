@@ -36,6 +36,8 @@ oauth_config:
       - chat:write
       - commands
       - emoji:read
+      - files:read
+      - files:write
       - im:history
       - im:read
       - im:write

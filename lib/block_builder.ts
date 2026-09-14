@@ -158,6 +158,23 @@ export class ButtonAction extends Action {
   }
 }
 
+// Renders a Slack-hosted file by ID. The @slack/types ImageBlock bundled with
+// this SDK version predates slack_file and insists on image_url, but
+// Blocks.render() is untyped so the newer shape passes through fine.
+export class ImageSection extends Section {
+  constructor(private file_id: string, private alt_text: string) {
+    super();
+  }
+
+  render(): any {
+    return {
+      type: "image",
+      slack_file: { id: this.file_id },
+      alt_text: this.alt_text,
+    };
+  }
+}
+
 export class ActionsSection extends Section {
   constructor(private actions: Action[]) {
     super();

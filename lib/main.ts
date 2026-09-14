@@ -20,7 +20,7 @@ import crypto from "crypto";
 import https from "https";
 
 import { Repository } from "typeorm";
-import { WebClient, ErrorCode } from "@slack/web-api";
+import { ErrorCode } from "@slack/web-api";
 import body_parser from "body-parser";
 
 import { NextApiRequest, NextApiResponse, PageConfig } from "next";
@@ -30,7 +30,6 @@ import { Confession } from "./models";
 import { sanitize } from "./sanitizer";
 
 import {
-  token,
   staging_channel,
   confessions_channel,
   slack_signing_secret,
@@ -41,10 +40,16 @@ import {
   ActionsSection,
   Blocks,
   ButtonAction,
+  ImageSection,
   MarkdownText,
   PlainText,
   TextSection,
 } from "./block_builder";
+import { web } from "./slack";
+import { copyImagesToChannel, selectImages } from "./images";
+import type { SlackFile } from "./images";
+
+export { web };
 
 export const api_config = {
   api: {
@@ -116,8 +121,6 @@ export async function setupMiddlewares(
     }
   }
 }
-
-export const web = new WebClient(token);
 
 export interface CommandData {
   token?: string;
@@ -204,11 +207,12 @@ export const EMPTY_CONFESSION_ERROR = "I can't stage an empty confession.";
 export async function stageDMConfession(
   message_ts: string,
   uid: string,
-  message: string
+  message: string,
+  files?: SlackFile[]
 ): Promise<void> {
-  // A DM with no text at all (e.g. a file or image upload) has nothing
-  // to publish, so don't offer to stage it in the first place.
-  if (!message?.trim()) {
+  // A DM with neither text nor a usable image has nothing to publish, so
+  // don't offer to stage it in the first place.
+  if (!message?.trim() && selectImages(files).images.length == 0) {
     console.log(`Empty DM, refusing to offer staging`);
     await web.chat.postMessage({
       channel: uid,
@@ -281,8 +285,10 @@ export async function reviveConfessions(repository: Repository<Confession>) {
       }
     }
     console.log(`Updating record...`);
+    const staging_copies = await attachStagingImages(record, newTs);
     try {
       record.staging_ts = newTs;
+      record.staging_image_file_ids = staging_copies;
       await repository.save(record);
     } catch (_) {
       throw `Failed to update Postgres record!`;
@@ -306,8 +312,15 @@ function createStagingBlocks(id: number, text: string): TextSection[] {
   return chunks.map((chunk) => new TextSection(new MarkdownText(chunk)));
 }
 
-const getStagingMessageBlocks = (id: number, text: string) => new Blocks([
+const getStagingMessageBlocks = (
+  id: number,
+  text: string,
+  image_file_ids?: string[]
+) => new Blocks([
   ...createStagingBlocks(id, sanitize(text)),
+  ...(image_file_ids ?? []).map(
+    (file_id, i) => new ImageSection(file_id, `Image ${i + 1} of confession #${id}`)
+  ),
   new ActionsSection([
     new ButtonAction(new PlainText(":true: Approve"), "approve", "approve"),
     new ButtonAction(
@@ -335,13 +348,14 @@ const getStagingMessageBlocks = (id: number, text: string) => new Blocks([
 
 export async function postStagingMessage(
   id: number,
-  text: string
+  text: string,
+  image_file_ids?: string[]
 ): Promise<string> {
   console.log(`Posting message to staging channel...`);
   const staging_message = await web.chat.postMessage({
     channel: staging_channel,
     text: "",
-    blocks: getStagingMessageBlocks(id, text),
+    blocks: getStagingMessageBlocks(id, text, image_file_ids),
   });
   if (!staging_message.ok) {
     throw "Failed to post message to staging channel";
@@ -350,13 +364,45 @@ export async function postStagingMessage(
   return staging_message.ts as string;
 }
 
+// Copies the author's images into the staging thread -- which is what gives
+// reviewers access to them -- then rewrites the staging message so they also
+// render inline, with no thread to open.
+async function attachStagingImages(
+  record: Confession,
+  staging_ts: string
+): Promise<string[]> {
+  const copies = await copyImagesToChannel(
+    record.image_file_ids,
+    staging_channel,
+    staging_ts,
+    record.id
+  );
+  if (copies.length == 0) return [];
+  console.log(`Adding ${copies.length} images to the staging message...`);
+  try {
+    await web.chat.update({
+      channel: staging_channel,
+      ts: staging_ts,
+      text: "",
+      blocks: getStagingMessageBlocks(record.id, record.text, copies),
+    });
+  } catch (e) {
+    // Non-fatal: the copies are already in the thread, so reviewers can still
+    // see them. Losing the inline render must not lose the confession.
+    console.log(`Failed to add images to the staging message!`);
+    console.log(JSON.stringify(e));
+  }
+  return copies;
+}
+
 export async function stageConfession(
   repository: Repository<Confession>,
   message: string,
-  uid: string
+  uid: string,
+  image_file_ids: string[] = []
 ): Promise<number> {
   console.log(`Staging confession...`);
-  if (!message?.trim()) {
+  if (!message?.trim() && image_file_ids.length == 0) {
     console.log(`Refusing to stage empty confession`);
     throw EMPTY_CONFESSION_ERROR;
   }
@@ -377,6 +423,7 @@ export async function stageConfession(
       uid_salt,
       uid_hash,
       user_id: uid,
+      image_file_ids,
     });
   } catch (_) {
     throw "Failed to insert Postgres record";
@@ -392,9 +439,11 @@ export async function stageConfession(
     console.log(`Rolled back changes. Notifying user...`);
     throw e;
   }
+  const staging_copies = await attachStagingImages(record, staging_ts);
   console.log(`Updating Postgres record...`);
   try {
     record.staging_ts = staging_ts;
+    record.staging_image_file_ids = staging_copies;
     await repository.save(record);
   } catch (_) {
     throw "Failed to update Postgres record";
@@ -451,6 +500,7 @@ export async function viewConfession(
     }
     ts = published_message.ts as string;
     console.log(`Published message!`);
+    await copyImagesToChannel(record.image_file_ids, target_channel, ts, record.id);
   }
   console.log(`Updating Postgres record...`);
   try {
@@ -579,7 +629,11 @@ export async function unviewConfession(
       channel: staging_channel,
       ts: staging_ts,
       text: "",
-      blocks: getStagingMessageBlocks(record.id, record.text),
+      blocks: getStagingMessageBlocks(
+        record.id,
+        record.text,
+        record.staging_image_file_ids
+      ),
     })
   } catch (e) {
     console.log("failed to update staging message!", JSON.stringify(e));

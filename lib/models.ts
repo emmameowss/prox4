@@ -30,4 +30,13 @@ export class Confession {
 
   @Column({ nullable: true })
   user_id?: string;
+
+  // The author's own uploads. Kept so copies can be re-made whenever the
+  // confession is published or restaged; never shown to anyone directly.
+  @Column("simple-array", { nullable: true })
+  image_file_ids?: string[];
+  // The bot-owned copies living in the staging channel, used to rebuild the
+  // staging message's inline images after an undo or a revive.
+  @Column("simple-array", { nullable: true })
+  staging_image_file_ids?: string[];
 }

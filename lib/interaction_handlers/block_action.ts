@@ -1,5 +1,6 @@
 import { BlockActionInteraction, InteractionHandler } from "../../pages/api/interaction_work";
 import { EMPTY_CONFESSION_ERROR, stageConfession, viewConfession, web } from "../main";
+import { droppedNotes, selectImages } from "../images";
 import { Blocks, InputSection, MarkdownText, PlainText, PlainTextInput, TextSection } from "../block_builder";
 import getRepository from "../db";
 import { approve_tw_id, undo_confirm_id, reveal_confirm_id } from "./view_submission";
@@ -91,17 +92,20 @@ const block_action: InteractionHandler<BlockActionInteraction> = async data => {
             if (!resp.ok) {
                 throw `Failed to fetch message contents!`;
             }
-            const message_contents = (resp as any).messages?.[0]?.text;
+            const message = (resp as any).messages?.[0];
+            const message_contents: string = message?.text ?? "";
+            const selection = selectImages(message?.files);
             // The message may have been edited or deleted between the prompt
             // and this click, so re-check before staging.
-            if (!message_contents?.trim()) {
+            if (!message_contents.trim() && selection.images.length == 0) {
                 throw EMPTY_CONFESSION_ERROR;
             }
             // Stage
             const id = await stageConfession(
                 repo,
                 message_contents,
-                data.user.id
+                data.user.id,
+                selection.images.map(file => file.id)
             );
             // Edit
             const resp2 = await web.chat.update({
@@ -110,7 +114,12 @@ const block_action: InteractionHandler<BlockActionInteraction> = async data => {
                 text: "",
                 blocks: new Blocks([
                     new TextSection(
-                        new MarkdownText(`:true: Staged as confession #${id}`),
+                        new MarkdownText(
+                            [
+                                `:true: Staged as confession #${id}`,
+                                ...droppedNotes(selection)
+                            ].join("\n")
+                        ),
                         null,
                         null
                     )
