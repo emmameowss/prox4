@@ -8,6 +8,7 @@
 
 import { web } from "./slack";
 import { token } from "./secrets_wrapper";
+import { stripMetadata, SUPPORTED_MIMETYPES } from "./strip_metadata";
 
 export const MAX_IMAGES = 2;
 
@@ -28,6 +29,7 @@ export interface SlackFile {
 export interface ImageSelection {
   images: SlackFile[];
   dropped_images: number;
+  dropped_format: number;
   dropped_other: number;
 }
 
@@ -36,9 +38,15 @@ export interface ImageSelection {
 export function selectImages(files?: SlackFile[]): ImageSelection {
   const all = files ?? [];
   const images = all.filter((file) => file.mimetype?.startsWith("image/"));
+  // Formats whose metadata we cannot strip are refused rather than sent on
+  // unsanitized.
+  const supported = images.filter((file) =>
+    SUPPORTED_MIMETYPES.includes(file.mimetype ?? "")
+  );
   return {
-    images: images.slice(0, MAX_IMAGES),
-    dropped_images: Math.max(0, images.length - MAX_IMAGES),
+    images: supported.slice(0, MAX_IMAGES),
+    dropped_images: Math.max(0, supported.length - MAX_IMAGES),
+    dropped_format: images.length - supported.length,
     dropped_other: all.length - images.length,
   };
 }
@@ -51,6 +59,13 @@ export function droppedNotes(selection: ImageSelection): string[] {
       `Only the first ${MAX_IMAGES} images were included; ${
         selection.dropped_images
       } ${selection.dropped_images == 1 ? "was" : "were"} dropped.`
+    );
+  }
+  if (selection.dropped_format > 0) {
+    notes.push(
+      `${selection.dropped_format} ${
+        selection.dropped_format == 1 ? "image was" : "images were"
+      } left out; only JPEG and PNG can have their metadata stripped.`
     );
   }
   if (selection.dropped_other > 0) {
@@ -158,11 +173,18 @@ export async function copyImagesToChannel(
       const file = (info as any).file as SlackFile;
       const contents = await downloadFile(file);
       if (contents == null) continue;
+      // EXIF on a phone photo carries GPS coordinates. Hiding who uploaded
+      // the file counts for little if the file still says where it was taken.
+      const stripped = stripMetadata(contents, file.mimetype);
+      if (stripped == null) {
+        console.log(`Could not strip metadata from file ${id}, skipping it`);
+        continue;
+      }
       // Never reuse the author's filename; it frequently contains their name.
       const filename = `confession-${confession_id}-${index + 1}.${extensionFor(
         file
       )}`;
-      const copy = await uploadImage(contents, filename, channel, thread_ts);
+      const copy = await uploadImage(stripped, filename, channel, thread_ts);
       if (copy != null) copies.push(copy);
     } catch (e) {
       console.log(`Failed to copy image ${id} of confession #${confession_id}`);
