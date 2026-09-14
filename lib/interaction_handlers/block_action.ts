@@ -1,5 +1,5 @@
 import { BlockActionInteraction, InteractionHandler } from "../../pages/api/interaction_work";
-import { stageConfession, viewConfession, web } from "../main";
+import { EMPTY_CONFESSION_ERROR, stageConfession, viewConfession, web } from "../main";
 import { Blocks, InputSection, MarkdownText, PlainText, PlainTextInput, TextSection } from "../block_builder";
 import getRepository from "../db";
 import { approve_tw_id, undo_confirm_id, reveal_confirm_id } from "./view_submission";
@@ -91,7 +91,12 @@ const block_action: InteractionHandler<BlockActionInteraction> = async data => {
             if (!resp.ok) {
                 throw `Failed to fetch message contents!`;
             }
-            const message_contents = (resp as any).messages[0].text;
+            const message_contents = (resp as any).messages?.[0]?.text;
+            // The message may have been edited or deleted between the prompt
+            // and this click, so re-check before staging.
+            if (!message_contents?.trim()) {
+                throw EMPTY_CONFESSION_ERROR;
+            }
             // Stage
             const id = await stageConfession(
                 repo,

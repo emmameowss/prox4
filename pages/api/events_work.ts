@@ -89,7 +89,7 @@ export default async function handler(
         !data.hidden
       ) {
         // Handle DM staging...
-        await stageDMConfession(data.ts, data.user);
+        await stageDMConfession(data.ts, data.user, data.text);
       }
     }
   }

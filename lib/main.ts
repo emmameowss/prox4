@@ -199,10 +199,24 @@ export function sameUser(fields: Confession, uid: string): boolean {
   );
 }
 
+export const EMPTY_CONFESSION_ERROR = "I can't stage an empty confession.";
+
 export async function stageDMConfession(
   message_ts: string,
-  uid: string
+  uid: string,
+  message: string
 ): Promise<void> {
+  // A DM with no text at all (e.g. a file or image upload) has nothing
+  // to publish, so don't offer to stage it in the first place.
+  if (!message?.trim()) {
+    console.log(`Empty DM, refusing to offer staging`);
+    await web.chat.postMessage({
+      channel: uid,
+      text: EMPTY_CONFESSION_ERROR,
+      thread_ts: message_ts,
+    });
+    return;
+  }
   console.log(`Posting confirmation message...`);
   const confirmation_message = await web.chat.postMessage({
     channel: uid,
@@ -342,6 +356,10 @@ export async function stageConfession(
   uid: string
 ): Promise<number> {
   console.log(`Staging confession...`);
+  if (!message?.trim()) {
+    console.log(`Refusing to stage empty confession`);
+    throw EMPTY_CONFESSION_ERROR;
+  }
   console.log(`Creating new UID salt...`);
   const uid_salt = crypto.randomBytes(16).toString("hex");
   console.log(`Hashing UID...`);
