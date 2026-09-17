@@ -525,7 +525,12 @@ export async function viewConfession(
       approved ? `:true: Approved${isMeta ? ' for meta' : ''}` : `:x: Rejected`
     } by <@${reviewer_uid}> <!date^${Math.floor(
       Date.now() / 1000
-    )}^{date_short_pretty} at {time}|${new Date().toISOString()}>.`;
+    )}^{date_short_pretty} at {time}|${new Date().toISOString()}>.${
+      // The log thread and the author DM are both best-effort (no log channel
+      // configured, no user_id on older confessions), so keep the reason here
+      // too - the staging message is the one surface that always renders.
+      reason ? `\nReason: ${sanitize(reason)}` : ""
+    }`;
     await web.chat.update({
       channel: staging_channel,
       ts: staging_ts,
