@@ -3,17 +3,81 @@ import { EMPTY_CONFESSION_ERROR, stageConfession, viewConfession, web } from "..
 import { droppedNotes, selectImages } from "../images";
 import { Blocks, InputSection, MarkdownText, PlainText, PlainTextInput, TextSection } from "../block_builder";
 import getRepository from "../db";
+import { isStagingMember } from "../moderators";
 import { confessionRef } from "../sanitizer";
+import { staging_channel } from "../secrets_wrapper";
 import { approve_tw_id, disapprove_reason_id, undo_confirm_id, reveal_confirm_id } from "./view_submission";
+
+// Actions that live on a staging message and decide a confession's fate.
+// Everything else (stage, cancel) lives in the author's own DM and is theirs
+// to click.
+const STAGING_ACTIONS = new Set([
+    "approve",
+    "approve:tw",
+    "approve:meta",
+    "disapprove",
+    "disapprove:reason",
+    "reveal",
+    "undo",
+]);
+
+async function denyStagingAction(trigger_id: string, reason: string): Promise<void> {
+    const resp = await web.views.open({
+        trigger_id,
+        view: {
+            type: "modal",
+            title: new PlainText(`Not allowed`).render(),
+            close: new PlainText("Close").render(),
+            blocks: new Blocks([
+                new TextSection(new MarkdownText(reason))
+            ]).render()
+        }
+    });
+    if (!resp.ok) {
+        throw "Failed to open modal";
+    }
+}
 
 const block_action: InteractionHandler<BlockActionInteraction> = async data => {
     console.log(`Block action!`);
-    const repo = await getRepository();
     if (data.actions.length <= 0) {
         console.log(`No action found`);
         return false;
     }
     const action = data.actions[0].value;
+    if (STAGING_ACTIONS.has(action)) {
+        // Anyone who can see a staging message can click its buttons, so
+        // check the clicker rather than trusting the click.
+        if (data.channel.id !== staging_channel) {
+            console.log(`Rejecting ${action} from channel ${data.channel.id}`);
+            await denyStagingAction(
+                data.trigger_id,
+                "Confessions can only be reviewed from the staging channel."
+            );
+            return true;
+        }
+        let is_member;
+        try {
+            is_member = await isStagingMember(data.user.id);
+        } catch (e) {
+            console.log(`Failed to check staging channel membership!`);
+            console.log(JSON.stringify(e));
+            await denyStagingAction(
+                data.trigger_id,
+                "Couldn't check whether you can review confessions, so nothing was done. Please try again."
+            );
+            return true;
+        }
+        if (!is_member) {
+            console.log(`Rejecting ${action} from non-member ${data.user.id}`);
+            await denyStagingAction(
+                data.trigger_id,
+                "Only members of the staging channel can review confessions."
+            );
+            return true;
+        }
+    }
+    const repo = await getRepository();
     switch(action) {
         case "approve": {
             console.log(`Approval of message ts=${data.message.ts}`);

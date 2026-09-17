@@ -46,6 +46,7 @@ oauth_config:
       - users:read
       - channels:history
       - groups:history
+      - groups:read
 settings:
   event_subscriptions:
     request_url: https://4xorp.vercel.app/api/events
