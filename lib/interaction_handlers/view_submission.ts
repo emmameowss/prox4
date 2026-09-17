@@ -206,6 +206,37 @@ const view_submission: InteractionHandler<ViewSubmissionInteraction> = async (da
                 staging_ts = staging_ts[0];
             }
             const repo = await getRepository();
+            const record = await repo.findOne({ staging_ts });
+            if (record === undefined) {
+                throw `Failed to find single Postgres record with staging_ts=${staging_ts}`;
+            }
+
+            // Writing a reason takes a while, so another reviewer may have
+            // decided the confession in the meantime. viewConfession would
+            // silently do nothing, so say so instead of closing the modal as
+            // if the rejection had gone through.
+            if (record.viewed) {
+                res.json({
+                    response_action: "update",
+                    view: {
+                        ...data.view,
+                        blocks: [
+                            ...data.view.blocks,
+                            new TextSection(
+                                new MarkdownText(
+                                    "Failed to reject: *this confession was already reviewed by someone else.*"
+                                )
+                            ).render(),
+                        ],
+                    },
+                } as {
+                    response_action: "update";
+                    view: {
+                        blocks: any[];
+                    };
+                });
+                return false;
+            }
 
             // quick assert for typeck
             if (
