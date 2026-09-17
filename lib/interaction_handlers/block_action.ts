@@ -4,7 +4,7 @@ import { droppedNotes, selectImages } from "../images";
 import { Blocks, InputSection, MarkdownText, PlainText, PlainTextInput, TextSection } from "../block_builder";
 import getRepository from "../db";
 import { confessionRef } from "../sanitizer";
-import { approve_tw_id, undo_confirm_id, reveal_confirm_id } from "./view_submission";
+import { approve_tw_id, disapprove_reason_id, undo_confirm_id, reveal_confirm_id } from "./view_submission";
 
 const block_action: InteractionHandler<BlockActionInteraction> = async data => {
     console.log(`Block action!`);
@@ -23,6 +23,30 @@ const block_action: InteractionHandler<BlockActionInteraction> = async data => {
         case "disapprove": {
             console.log(`Disapproval of message ts=${data.message.ts}`);
             await viewConfession(repo, data.message.ts, false, data.user.id);
+            break;
+        }
+        case "disapprove:reason": {
+            console.log(`Disapproval with reason of message ts=${data.message.ts}`);
+            const resp = await web.views.open({
+                trigger_id: data.trigger_id,
+                view: {
+                    callback_id: disapprove_reason_id(data.message.ts),
+                    type: "modal",
+                    title: new PlainText(`Reject with reason`).render(),
+                    submit: new PlainText("Reject").render(),
+                    close: new PlainText("Cancel").render(),
+                    blocks: new Blocks([
+                        new InputSection(
+                            new PlainTextInput("disapprove_reason_input", true),
+                            new PlainText("Reason"),
+                            "reason"
+                        )
+                    ]).render()
+                }
+            });
+            if (!resp.ok) {
+                throw "Failed to open modal";
+            }
             break;
         }
         case "approve:tw": {

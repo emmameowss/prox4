@@ -32,6 +32,8 @@ export const [react_modal_id, react_modal_handler] = make_dialog<{
 
 export const [approve_tw_id, approve_tw_handler] = make_dialog<string>("approve_tw");
 
+export const [disapprove_reason_id, disapprove_reason_handler] = make_dialog<string>("disapprove_reason");
+
 export const [undo_confirm_id, undo_confirm_handler] = make_dialog<{
     ts: string,
     reviewer_uid: string,
@@ -196,6 +198,31 @@ const view_submission: InteractionHandler<ViewSubmissionInteraction> = async (da
                 thread_ts: updatedRecord?.published_ts,
             });
             if (!r.ok) throw `Failed to reply in thread`;
+            return true;
+        }),
+
+        disapprove_reason_handler(async (staging_ts) => {
+            if(Array.isArray(staging_ts)) {
+                staging_ts = staging_ts[0];
+            }
+            const repo = await getRepository();
+
+            // quick assert for typeck
+            if (
+                data.view.state.values.reason.disapprove_reason_input.type !=
+                "plain_text_input"
+            )
+                return false;
+
+            await viewConfession(
+                repo,
+                staging_ts,
+                false,
+                data.user.id,
+                null,
+                false,
+                data.view.state.values.reason.disapprove_reason_input.value
+            );
             return true;
         }),
 

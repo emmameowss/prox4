@@ -324,11 +324,6 @@ const getStagingMessageBlocks = (
   new ActionsSection([
     new ButtonAction(new PlainText(":true: Approve"), "approve", "approve"),
     new ButtonAction(
-        new PlainText(":x: Reject"),
-        "disapprove",
-        "disapprove"
-    ),
-    new ButtonAction(
         new PlainText(":angerydog: Approve with TW"),
         "approve:tw",
         "approve:tw"
@@ -337,6 +332,16 @@ const getStagingMessageBlocks = (
         new PlainText(":office: Approve for meta"),
         "approve:meta",
         "approve:meta"
+    ),
+    new ButtonAction(
+        new PlainText(":x: Reject"),
+        "disapprove",
+        "disapprove"
+    ),
+    new ButtonAction(
+        new PlainText(":no_entry_sign: Reject with reason"),
+        "disapprove:reason",
+        "disapprove:reason"
     ),
     new ButtonAction(
         new PlainText(":eyes: Reveal"),
@@ -458,7 +463,8 @@ export async function viewConfession(
   approved: boolean,
   reviewer_uid: string,
   tw_text: string | null = null,
-  isMeta: boolean = false
+  isMeta: boolean = false,
+  reason: string | null = null
 ): Promise<void> {
   console.log(
     `${
@@ -541,8 +547,22 @@ export async function viewConfession(
     console.log(JSON.stringify(e));
     throw `Failed to update staging message`;
   }
-  await postConfessionLog(record.id, { type: "view", approved: record.approved, meta: record.meta });
-  await notifyAuthor(record, approved);
+  const log_ts = await postConfessionLog(record.id, { type: "view", approved: record.approved, meta: record.meta });
+  if (reason && log_ts && log_channel) {
+    console.log(`Replying with rejection reason in log thread...`);
+    try {
+      await web.chat.postMessage({
+        channel: log_channel,
+        text: sanitize(reason),
+        thread_ts: log_ts,
+      });
+    } catch (e) {
+      console.log(`Failed to send rejection reason to log channel!`);
+      console.log(JSON.stringify(e));
+      // non-fatal error
+    }
+  }
+  await notifyAuthor(record, approved, reason);
   console.log(`Deleted!`);
 }
 
@@ -667,8 +687,8 @@ export async function postConfessionLog(
     approved: boolean;
     meta?: boolean;
   },
-): Promise<void> {
-  if (log_channel == null) return;
+): Promise<string | null> {
+  if (log_channel == null) return null;
 
   let actionText;
   if (action.type == "view") {
@@ -679,8 +699,9 @@ export async function postConfessionLog(
 
   const logText = `Confession *${confessionRef(id)}* was *${actionText}*`;
   console.log(`Sending message to log channel...`);
+  let log_message;
   try {
-    await web.chat.postMessage({
+    log_message = await web.chat.postMessage({
       channel: log_channel,
       text: logText,
     });
@@ -688,14 +709,16 @@ export async function postConfessionLog(
     console.log(`Failed to send log message!`);
     console.log(JSON.stringify(e));
     // non-fatal error
-    return;
+    return null;
   }
   console.log(`Sent!`);
+  return log_message.ok ? (log_message.ts as string) : null;
 }
 
 export async function notifyAuthor(
   record: Confession,
-  approved: boolean
+  approved: boolean,
+  reason: string | null = null
 ): Promise<void> {
   if (!record.user_id) {
     console.log(
@@ -727,6 +750,9 @@ export async function notifyAuthor(
     }
   } else {
     text = `:x: Your confession *${confessionRef(record.id)}* was rejected.`;
+    if (reason) {
+      text += `\nReason: ${sanitize(reason)}`;
+    }
   }
 
   console.log(`Sending decision DM to author of confession #${record.id}...`);
