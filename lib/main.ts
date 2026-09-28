@@ -494,58 +494,37 @@ export async function viewConfession(
   const target_channel = isMeta ? meta_channel : confessions_channel;
   if (approved) {
     console.log(`Publishing message...`);
-    const published_message = await web.chat.postMessage({
-      channel: target_channel,
-      text: sanitize(
-        `*${record.id}*:${tw_text ? " TW:" : ""} ${tw_text ?? record.text} ${
-          tw_text?.trim() ? "— open thread to view" : ""
-        }`
-      ),
-    });
-    if (!published_message.ok) {
-      throw `Failed to publish message!`;
-    }
-    ts = published_message.ts as string;
-    console.log(`Published message!`);
+    const confession_text = sanitize(
+      `*${record.id}*:${tw_text ? " TW:" : ""} ${tw_text ?? record.text} ${
+        tw_text?.trim() ? "— open thread to view" : ""
+      }`
+    );
     const image_copies = await copyImagesToChannel(
       record.image_file_ids,
       undefined,
       undefined,
       record.id
     );
-    if (image_copies.length > 0) {
-      try {
-        await web.chat.update({
-          channel: target_channel,
-          ts,
-          text: sanitize(
-            `*${record.id}*:${tw_text ? " TW:" : ""} ${tw_text ?? record.text} ${
-              tw_text?.trim() ? "— open thread to view" : ""
-            }`
-          ),
-          blocks: new Blocks([
-            new TextSection(
-              new MarkdownText(
-                sanitize(
-                  `*${record.id}*:${tw_text ? " TW:" : ""} ${tw_text ?? record.text} ${
-                    tw_text?.trim() ? "— open thread to view" : ""
-                  }`
-                )
-              )
-            ),
-            ...image_copies.map(
-              (file_id, i) =>
-                new ImageSection(file_id, `Image ${i + 1} of confession #${confession_id}`)
-            ),
-          ]).render(),
-        });
-      } catch (e) {
-        // Image blocks are a presentation enhancement; keep the published
-        // confession if Slack refuses to update its blocks.
-        console.log(`Failed to attach images to confession #${confession_id}`);
-        console.log(JSON.stringify(e));
-      }
+    const published_message = await web.chat.postMessage({
+      channel: target_channel,
+      text: confession_text,
+      ...(image_copies.length > 0
+        ? {
+            blocks: new Blocks([
+              new TextSection(new MarkdownText(confession_text)),
+              ...image_copies.map(
+                (file_id, i) =>
+                  new ImageSection(file_id, `Image ${i + 1} of confession #${confession_id}`)
+              ),
+            ]).render(),
+          }
+        : {}),
+    });
+    if (!published_message.ok) {
+      throw `Failed to publish message: ${published_message.error ?? "unknown Slack error"}`;
     }
+    ts = published_message.ts as string;
+    console.log(`Published message!`);
   }
   console.log(`Updating Postgres record...`);
   try {
