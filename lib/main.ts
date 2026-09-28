@@ -472,7 +472,7 @@ export async function viewConfession(
     } confession with staging_ts=${staging_ts}...`
   );
   // Check if message is in Postgres
-  let record;
+  let record: Confession | undefined;
   try {
     record = await repository.findOne({
       staging_ts,
@@ -483,6 +483,7 @@ export async function viewConfession(
   if (record === undefined) {
     throw `Failed to find single Postgres record with staging_ts=${staging_ts}`;
   }
+  const confession_id = record.id;
   if (record.viewed) {
     // return, already viewed
     console.log(`Record already viewed, returning`);
@@ -534,14 +535,14 @@ export async function viewConfession(
             ),
             ...image_copies.map(
               (file_id, i) =>
-                new ImageSection(file_id, `Image ${i + 1} of confession #${record.id}`)
+                new ImageSection(file_id, `Image ${i + 1} of confession #${confession_id}`)
             ),
           ]).render(),
         });
       } catch (e) {
         // Image blocks are a presentation enhancement; keep the published
         // confession if Slack refuses to update its blocks.
-        console.log(`Failed to attach images to confession #${record.id}`);
+        console.log(`Failed to attach images to confession #${confession_id}`);
         console.log(JSON.stringify(e));
       }
     }
