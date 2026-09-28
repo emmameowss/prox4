@@ -707,6 +707,7 @@ export async function unviewConfession(
   }
 
   await postConfessionLog(record.id, { type: "undo", approved: old_approved ?? false });
+  await notifyAuthorUndo(record, old_approved ?? false);
 }
 
 export async function postConfessionLog(
@@ -797,6 +798,29 @@ export async function notifyAuthor(
     return;
   }
   console.log(`Sent!`);
+}
+
+async function notifyAuthorUndo(
+  record: Confession,
+  was_approved: boolean
+): Promise<void> {
+  if (!record.user_id) {
+    console.log(
+      `Confession #${record.id} has no user_id, skipping undo notification`
+    );
+    return;
+  }
+
+  const text = was_approved
+    ? `:rewind: Your confession *${confessionRef(record.id)}* was unapproved and removed from the confessions channel. It is back in the review queue.`
+    : `:rewind: The rejection of your confession *${confessionRef(record.id)}* was undone. It is back in the review queue.`;
+  try {
+    await web.chat.postMessage({ channel: record.user_id, text });
+  } catch (e) {
+    console.log(`Failed to send undo notification for confession #${record.id}`);
+    console.log(JSON.stringify(e));
+    // Notification delivery is best-effort; the undo itself has completed.
+  }
 }
 
 export function verifySignature(req: NextApiRequest): boolean {
