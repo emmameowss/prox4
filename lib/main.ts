@@ -506,7 +506,45 @@ export async function viewConfession(
     }
     ts = published_message.ts as string;
     console.log(`Published message!`);
-    await copyImagesToChannel(record.image_file_ids, target_channel, ts, record.id);
+    const image_copies = await copyImagesToChannel(
+      record.image_file_ids,
+      undefined,
+      undefined,
+      record.id
+    );
+    if (image_copies.length > 0) {
+      try {
+        await web.chat.update({
+          channel: target_channel,
+          ts,
+          text: sanitize(
+            `*${record.id}*:${tw_text ? " TW:" : ""} ${tw_text ?? record.text} ${
+              tw_text?.trim() ? "— open thread to view" : ""
+            }`
+          ),
+          blocks: new Blocks([
+            new TextSection(
+              new MarkdownText(
+                sanitize(
+                  `*${record.id}*:${tw_text ? " TW:" : ""} ${tw_text ?? record.text} ${
+                    tw_text?.trim() ? "— open thread to view" : ""
+                  }`
+                )
+              )
+            ),
+            ...image_copies.map(
+              (file_id, i) =>
+                new ImageSection(file_id, `Image ${i + 1} of confession #${record.id}`)
+            ),
+          ]).render(),
+        });
+      } catch (e) {
+        // Image blocks are a presentation enhancement; keep the published
+        // confession if Slack refuses to update its blocks.
+        console.log(`Failed to attach images to confession #${record.id}`);
+        console.log(JSON.stringify(e));
+      }
+    }
   }
   console.log(`Updating Postgres record...`);
   try {

@@ -117,7 +117,7 @@ async function downloadFile(file: SlackFile): Promise<Buffer | null> {
 async function uploadImage(
   contents: Buffer,
   filename: string,
-  channel: string,
+  channel: string | undefined,
   thread_ts?: string
 ): Promise<string | null> {
   const reserved = await web.apiCall("files.getUploadURLExternal", {
@@ -142,7 +142,7 @@ async function uploadImage(
   const completed = await web.apiCall("files.completeUploadExternal", {
     // apiCall form-encodes its arguments, so this has to be a JSON string.
     files: JSON.stringify([{ id: file_id }]),
-    channel_id: channel,
+    ...(channel ? { channel_id: channel } : {}),
     ...(thread_ts ? { thread_ts } : {}),
   });
   if (!completed.ok) {
@@ -157,7 +157,7 @@ async function uploadImage(
 // failing the whole confession.
 export async function copyImagesToChannel(
   file_ids: string[] | undefined,
-  channel: string,
+  channel: string | undefined,
   thread_ts: string | undefined,
   confession_id: number
 ): Promise<string[]> {
@@ -192,7 +192,9 @@ export async function copyImagesToChannel(
     }
   }
   console.log(
-    `Copied ${copies.length}/${file_ids.length} images of confession #${confession_id} to ${channel}`
+    `Copied ${copies.length}/${file_ids.length} images of confession #${confession_id}${
+      channel ? ` to ${channel}` : " as private Slack files"
+    }`
   );
   return copies;
 }
