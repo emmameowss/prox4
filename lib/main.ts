@@ -32,6 +32,7 @@ import { confessionRef, sanitize } from "./sanitizer";
 import {
   staging_channel,
   confessions_channel,
+  image_storage_channel,
   slack_signing_secret,
   meta_channel,
   log_channel,
@@ -501,7 +502,7 @@ export async function viewConfession(
     );
     const image_copies = await copyImagesToChannel(
       record.image_file_ids,
-      undefined,
+      image_storage_channel,
       undefined,
       record.id
     );

@@ -24,6 +24,7 @@ export let airtable_api_key: string | null;
 export let airtable_base: string | null;
 export let staging_channel: string;
 export let confessions_channel: string;
+export let image_storage_channel: string;
 export let meta_channel: string;
 export let log_channel: string | null;
 export let slack_signing_secret: string;
@@ -48,6 +49,7 @@ try {
   token = secrets.token;
   staging_channel = secrets.staging_channel;
   confessions_channel = secrets.confessions_channel;
+  image_storage_channel = secrets.image_storage_channel ?? check_env("IMAGE_STORAGE_CHANNEL_ID");
   meta_channel = secrets.meta_channel;
   log_channel = secrets.log_channel ?? null;
   slack_signing_secret = secrets.slack_signing_secret;
@@ -58,6 +60,7 @@ try {
   token = check_env("SLACK_BOT_TOKEN");
   staging_channel = check_env("STAGING_CHANNEL_ID");
   confessions_channel = check_env("CONFESSIONS_CHANNEL_ID");
+  image_storage_channel = check_env("IMAGE_STORAGE_CHANNEL_ID");
   meta_channel = check_env("META_CHANNEL_ID");
   log_channel = check_null_env("LOG_CHANNEL_ID");
   slack_signing_secret = check_env("SLACK_SIGNING_SECRET");
