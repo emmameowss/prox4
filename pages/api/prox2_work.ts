@@ -94,7 +94,7 @@ export default async function handler(
     console.log(`User tried to stage confession outside of DM!`);
     await failRequest(
       data.response_url,
-      `Uh oh! You tried to stage a confession outside a DM. Try re-running this command inside a DM:\n/4xorp ${data.text}`
+      `Uh oh! You tried to stage a confession outside a DM. Try re-running this command inside a DM:\nprox4 ${data.text}`
     );
     res.end();
     return;
@@ -112,7 +112,7 @@ export default async function handler(
   console.log(`Notifying user...`);
   await succeedRequest(
     data.response_url,
-    `Your message has been staged as confession ${confessionRef(confession_id)} and will appear in <#C0C0K5D0468> if approved by the 4xorp review team! (emma)`
+    `:true: Your message has been staged as confession ${confessionRef(confession_id)} and will appear in <#C0C0K5D0468> if approved by the Prox4 review team!`
   );
   console.log(`Request success`);
   res.writeHead(200).end();
