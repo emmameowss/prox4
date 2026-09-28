@@ -506,6 +506,11 @@ export async function viewConfession(
       undefined,
       record.id
     );
+    if (image_copies.length > 0) {
+      // Slack may accept the external upload before the file is ready to be
+      // referenced by ID in a message block.
+      await new Promise((resolve) => setTimeout(resolve, 1000));
+    }
     const published_message = await web.chat.postMessage({
       channel: target_channel,
       text: confession_text,
